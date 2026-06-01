@@ -1,22 +1,19 @@
 """
-test_compare.py - Automated Comparison Test
-============================================
+test_compare.py - Automated Three-Way Comparison Test
+======================================================
 
-Runs both implementations on the same 5 test inputs and reports whether the
-outputs are functionally equivalent.
+Runs THREE implementations on the same 5 test inputs and reports whether
+their outputs are functionally equivalent:
+
+  1. coinshuffle_mixing.py    - student's ORIGINAL implementation
+  2. coinshuffle_reference.py - Python 3 port of atong01/coinshuffle (REFERENCE)
+  3. naive_mixer.py           - centralized-mixer BASELINE (pedagogical)
 
 Functional equivalence here means:
   - Same set of output addresses (the SET, not the order)
   - Same number of inputs and outputs
   - Same total amount preserved
-  - Both implementations report status SUCCESS
-
-The order of output addresses is allowed to differ, because that is precisely
-the whole point of mixing: a random permutation is applied. What matters is
-that the same coins end up at the same set of new addresses.
-
-Usage:
-    python test_compare.py
+  - All implementations report status SUCCESS
 """
 
 import json
@@ -24,12 +21,6 @@ import subprocess
 import sys
 
 
-# The 5 test cases the instructor might give. We pick a variety:
-#  - small group (2 players, the minimum)
-#  - typical group (3 players)
-#  - bigger groups
-#  - varying amounts
-#  - varying seeds
 TEST_CASES = [
     {"name": "Test 1: minimum group",      "num_players": 2, "amount": 1,  "seed": 7},
     {"name": "Test 2: typical small mix",  "num_players": 3, "amount": 1,  "seed": 42},
@@ -40,66 +31,22 @@ TEST_CASES = [
 
 
 def run_implementation(script_name, num_players, amount, seed):
-    """Run one implementation and return its parsed JSON output."""
     result = subprocess.run(
         [sys.executable, script_name, str(num_players), str(amount), str(seed)],
-        capture_output=True,
-        text=True,
-        timeout=30,
+        capture_output=True, text=True, timeout=30,
     )
     if result.returncode != 0:
         raise RuntimeError(f"{script_name} crashed:\n{result.stderr}")
     return json.loads(result.stdout)
 
 
-def compare(coin_result, naive_result):
-    """Compare two results. Returns (passed: bool, reasons: list[str])."""
-    reasons = []
-
-    # 1) Both must have status SUCCESS
-    if coin_result.get("status") != "SUCCESS":
-        reasons.append(f"coinshuffle status = {coin_result.get('status')}")
-    if naive_result.get("status") != "SUCCESS":
-        reasons.append(f"naive status = {naive_result.get('status')}")
-
-    # 2) Same set of output addresses (order doesn't matter)
-    coin_outputs = set(coin_result.get("output_addresses_shuffled", []))
-    naive_outputs = set(naive_result.get("output_addresses_shuffled", []))
-    if coin_outputs != naive_outputs:
-        only_coin = coin_outputs - naive_outputs
-        only_naive = naive_outputs - coin_outputs
-        if only_coin:
-            reasons.append(f"only in coinshuffle: {only_coin}")
-        if only_naive:
-            reasons.append(f"only in naive: {only_naive}")
-
-    # 3) Same number of inputs/outputs
-    if len(coin_result["input_addresses"]) != len(naive_result["input_addresses"]):
-        reasons.append("input counts differ")
-    if len(coin_result["output_addresses_shuffled"]) != len(
-        naive_result["output_addresses_shuffled"]
-    ):
-        reasons.append("output counts differ")
-
-    # 4) Total amount preserved in both transactions
-    coin_in_total = sum(x["amount"] for x in coin_result["transaction"]["inputs"])
-    coin_out_total = sum(x["amount"] for x in coin_result["transaction"]["outputs"])
-    naive_in_total = sum(x["amount"] for x in naive_result["transaction"]["inputs"])
-    naive_out_total = sum(x["amount"] for x in naive_result["transaction"]["outputs"])
-    if coin_in_total != coin_out_total:
-        reasons.append(f"coinshuffle conserves money? in={coin_in_total} out={coin_out_total}")
-    if naive_in_total != naive_out_total:
-        reasons.append(f"naive conserves money? in={naive_in_total} out={naive_out_total}")
-    if coin_in_total != naive_in_total:
-        reasons.append("input totals differ between implementations")
-
-    return (len(reasons) == 0, reasons)
-
-
 def main():
-    print("=" * 70)
-    print("CoinShuffle vs Naive Mixer - Automated Comparison Test")
-    print("=" * 70)
+    print("=" * 78)
+    print(" Three-way comparison: ORIGINAL vs REFERENCE vs BASELINE")
+    print("=" * 78)
+    print("  ORIGINAL  = coinshuffle_mixing.py    (student's own implementation)")
+    print("  REFERENCE = coinshuffle_reference.py (port of atong01/coinshuffle)")
+    print("  BASELINE  = naive_mixer.py           (centralized-mixer baseline)")
 
     passed = 0
     failed = 0
@@ -110,42 +57,56 @@ def main():
               f"amount={case['amount']}, seed={case['seed']}")
 
         try:
-            coin = run_implementation("coinshuffle_mixing.py",
-                                      case["num_players"], case["amount"], case["seed"])
-            naive = run_implementation("naive_mixer.py",
-                                       case["num_players"], case["amount"], case["seed"])
+            original = run_implementation("coinshuffle_mixing.py",
+                                          case["num_players"], case["amount"], case["seed"])
+            reference = run_implementation("coinshuffle_reference.py",
+                                           case["num_players"], case["amount"], case["seed"])
+            baseline = run_implementation("naive_mixer.py",
+                                          case["num_players"], case["amount"], case["seed"])
         except Exception as e:
             print(f"    [ERROR] {e}")
             failed += 1
             continue
 
-        ok, reasons = compare(coin, naive)
+        orig_set = set(original["output_addresses_shuffled"])
+        ref_set = set(reference["output_addresses_shuffled"])
+        base_set = set(baseline["output_addresses_shuffled"])
 
-        # Pretty-print both output address sets for visual inspection
-        coin_outs = sorted(coin["output_addresses_shuffled"])
-        naive_outs = sorted(naive["output_addresses_shuffled"])
-        print(f"    coinshuffle outputs (sorted): {coin_outs}")
-        print(f"    naive outputs       (sorted): {naive_outs}")
+        all_match = orig_set == ref_set == base_set
+        money_ok = (
+            sum(x["amount"] for x in original["transaction"]["inputs"])
+            == sum(x["amount"] for x in original["transaction"]["outputs"])
+            == sum(x["amount"] for x in reference["transaction"]["inputs"])
+            == sum(x["amount"] for x in reference["transaction"]["outputs"])
+            == sum(x["amount"] for x in baseline["transaction"]["inputs"])
+            == sum(x["amount"] for x in baseline["transaction"]["outputs"])
+        )
 
-        # Show the privacy difference - this is the whole point
-        coin_link = coin["unlinkability"].get("observer_can_link")
-        naive_link = naive["unlinkability"].get("mixer_can_link")
-        print(f"    privacy: coinshuffle.observer_can_link={coin_link} | "
-              f"naive.mixer_can_link={naive_link}")
+        print(f"    original  outputs (sorted): {sorted(orig_set)}")
+        print(f"    reference outputs (sorted): {sorted(ref_set)}")
+        print(f"    baseline  outputs (sorted): {sorted(base_set)}")
 
-        if ok:
-            print(f"    [PASS] functional equivalence verified")
+        orig_link = original["unlinkability"].get("observer_can_link")
+        ref_link = reference["unlinkability"].get("observer_can_link")
+        base_link = baseline["unlinkability"].get("mixer_can_link")
+        print(f"    privacy: original.observer_can_link={orig_link} | "
+              f"reference.observer_can_link={ref_link} | "
+              f"baseline.mixer_can_link={base_link}")
+
+        if all_match and money_ok:
+            print(f"    [PASS] all three implementations are functionally equivalent")
             passed += 1
         else:
-            print(f"    [FAIL] reasons:")
-            for r in reasons:
-                print(f"           - {r}")
+            print(f"    [FAIL]")
+            if not all_match:
+                print(f"           - output sets differ across implementations")
+            if not money_ok:
+                print(f"           - money is not conserved somewhere")
             failed += 1
 
-    print("\n" + "=" * 70)
+    print("\n" + "=" * 78)
     print(f"RESULT: {passed} passed, {failed} failed (out of {len(TEST_CASES)})")
-    print("=" * 70)
-
+    print("=" * 78)
     return 0 if failed == 0 else 1
 
 
