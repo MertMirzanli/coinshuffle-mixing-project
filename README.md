@@ -41,23 +41,28 @@ requiring a trusted third party.
 
 ```
 coinshuffle-mixing-project/
-├── coinshuffle_mixing.py    # Original implementation (the project)
-├── naive_mixer.py           # Reference baseline (centralized mixer, pre-CoinShuffle era)
-├── test_compare.py          # Automated 5-case comparison test
-└── README.md                # This file
+├── coinshuffle_mixing.py      # ORIGINAL implementation (written from scratch)
+├── coinshuffle_reference.py   # REFERENCE: Python 3 port of atong01/coinshuffle
+├── naive_mixer.py             # BASELINE: centralized mixer (pre-CoinShuffle era)
+├── test_compare.py            # Automated three-way comparison test
+└── README.md                  # This file
 ```
 
-Three Python files, no other dependencies beyond the `cryptography` library.
+### Roles of each implementation
+
+| File | Authored by | Academic role |
+|---|---|---|
+| `coinshuffle_mixing.py` | Mert Mirzanli (student) | **Original implementation** — designed and written from scratch based on the CoinShuffle paper |
+| `coinshuffle_reference.py` | Alexander Tong (atong01), Python 3 port by Mert Mirzanli | **Reference implementation** — adapted from an open-source 2017 CoinShuffle project |
+| `naive_mixer.py` | Mert Mirzanli (student) | **Baseline** — represents the pre-CoinShuffle centralized-mixer approach |
+| `test_compare.py` | Mert Mirzanli (student) | Test runner — verifies functional equivalence across all three implementations |
 
 ---
 
 ## 3. Required software and dependencies
 
 - **Python 3.10 or newer** (tested on Python 3.14 on Windows 11)
-- **`cryptography` library** — used for RSA-OAEP, AES via Fernet, and RSA-PSS
-  signatures
-
-No build step, no compilation, no external services.
+- **`cryptography` library**
 
 ### Install
 
@@ -84,30 +89,30 @@ cd coinshuffle-mixing-project
 pip install cryptography
 ```
 
-### Step 3 — Run the CoinShuffle implementation
-
-Default run (3 players, amount 1, deterministic seed 42):
+### Step 3 — Run the original implementation
 
 ```bash
 python coinshuffle_mixing.py
-```
-
-Custom run (any number of players, amount, and seed):
-
-```bash
 python coinshuffle_mixing.py <num_players> <amount> <seed>
 # example:
 python coinshuffle_mixing.py 5 10 100
 ```
 
-### Step 4 — Run the reference baseline
+### Step 4 — Run the reference implementation
+
+```bash
+python coinshuffle_reference.py
+python coinshuffle_reference.py 5 10 100
+```
+
+### Step 5 — Run the baseline
 
 ```bash
 python naive_mixer.py
 python naive_mixer.py 5 10 100
 ```
 
-### Step 5 — Run the automated comparison test
+### Step 6 — Run the automated comparison test
 
 ```bash
 python test_compare.py
@@ -119,21 +124,24 @@ Expected output ends with:
 RESULT: 5 passed, 0 failed (out of 5)
 ```
 
+The test runs all three implementations against five different test inputs
+and verifies they produce the same set of output addresses.
+
 ---
 
 ## 5. Sample input and output
 
 ### Input
 
-The CLI accepts three positional arguments:
+Every script accepts the same three positional arguments:
 
 | Argument | Meaning | Default |
 |---|---|---|
 | `num_players` | Number of participants in the mixing round | 3 |
-| `amount` | Coin amount each player mixes (must be equal for all) | 1 |
+| `amount` | Coin amount each player mixes | 1 |
 | `seed` | Random seed for deterministic reproduction | 42 |
 
-### Output (truncated)
+### Output (truncated example from `coinshuffle_mixing.py`)
 
 ```json
 {
@@ -145,42 +153,32 @@ The CLI accepts three positional arguments:
     "0x6996dc547984414cd0ad",
     "0x29a9c482a0fdd76aa0c3"
   ],
-  "transaction": {
-    "inputs":  [{"address": "INPUT_001", "amount": 1}, ...],
-    "outputs": [{"address": "0x2a71...", "amount": 1}, ...],
-    "signatures": [...]
-  },
   "unlinkability": {
     "anonymity_set_size": 3,
     "possible_input_output_mappings": 6,
-    "observer_can_link": false,
-    "explanation": "An external observer sees 3 input addresses and 3 output
-                    addresses but cannot determine which input paid which output.
-                    All 6 permutations are equally likely."
-  },
-  "log": ["REGISTER P1 ...", "ANNOUNCE 3 players ...", "SHUFFLE step 1/3 ...", ...]
+    "observer_can_link": false
+  }
 }
 ```
 
-Notice that the output is fully structured JSON — this is intentional so the
-result of `coinshuffle_mixing.py` and `naive_mixer.py` can be programmatically
-compared (see `test_compare.py`).
+The output is fully structured JSON so all three implementations can be
+programmatically compared.
 
 ---
 
 ## 6. Testing instructions
 
-`test_compare.py` runs both implementations against five test inputs and
-checks **functional equivalence**:
+`test_compare.py` runs all three implementations against the same five test
+inputs and checks **functional equivalence**:
 
 | Check | Pass criterion |
 |---|---|
-| Both runs status `SUCCESS` | Yes / No |
-| Same set of output addresses | Set equality (order may differ; that's the point of mixing) |
-| Same number of inputs and outputs | Counts match |
-| Total amount preserved | `sum(inputs) == sum(outputs)` in both runs |
+| All three status `SUCCESS` | Yes |
+| Same set of output addresses across all three | Set equality (order may differ) |
+| Same input/output counts | All implementations agree |
+| Total amount preserved | `sum(inputs) == sum(outputs)` everywhere |
 
-The five test cases cover:
+### The five test cases
 
 | # | Scenario | Players | Amount | Seed |
 |---|---|---|---|---|
@@ -190,114 +188,130 @@ The five test cases cover:
 | 4 | Larger amount | 4 | 10 | 999 |
 | 5 | Bigger group | 6 | 5 | 2024 |
 
-All five tests pass on the reference machine (Python 3.14 on Windows 11).
+All five tests pass.
 
-The test also prints the privacy difference between the two designs, e.g.:
+The test output also surfaces the central academic finding of the project:
 
 ```
-privacy: coinshuffle.observer_can_link=False | naive.mixer_can_link=True
+privacy: original.observer_can_link=False | reference.observer_can_link=False | baseline.mixer_can_link=True
 ```
 
-This is the central academic point of the project: both implementations
-produce the same *set* of shuffled outputs, but only CoinShuffle hides the
-input-to-output permutation from every party, including the mixer itself.
+All three implementations produce the same *set* of shuffled outputs, but
+only the CoinShuffle-based ones (original and reference) hide the
+input-to-output permutation from every party. The baseline gets the same
+result only by trusting a central mixer that knows everything.
 
 ---
 
-## 7. Reference implementation
+## 7. Reference implementation details
 
-The grading rubric requires a reference implementation to compare against.
-Three sources were studied for this project:
+### `coinshuffle_reference.py` — Python 3 port of `atong01/coinshuffle`
 
-| Source | Type | Status |
+The reference implementation is a **Python 3 port** of the open-source
+CoinShuffle implementation by Alexander Tong (`atong01`):
+
+- **Upstream:** https://github.com/atong01/coinshuffle
+- **Upstream file:** `coin_shuffle.py`
+- **Upstream year:** 2017
+- **License:** See upstream repository
+
+### Why a port was necessary
+
+The upstream code from 2017 is **not directly runnable** today:
+
+1. **Python 2.** It uses Python 2 syntax (`iteritems()`, parenthesis-less `print`).
+2. **Deprecated cryptography.** It depends on `pycrypto`, deprecated in 2018, not installable on Python 3.10+.
+3. **External helper module.** Depends on a separate `util.py`.
+4. **Numpy dependency** for `np.random.permutation` only.
+5. **Distributed transport.** Uses HTTP via `requests`, requires multiple Flask servers and shell scripts.
+
+### Adaptation changes (deliberately minimal)
+
+| # | Change | Reason |
 |---|---|---|
-| Ruffing et al., 2014 — *CoinShuffle: Practical Decentralized Coin Mixing for Bitcoin* | Original ESORICS paper | Read in full; used as the protocol specification |
-| `atong01/coinshuffle` (https://github.com/atong01/coinshuffle) | Open-source Python prototype, 2017 | **Studied** for structure, but **not runnable** on modern Python — its `requirements.txt` pins `pycrypto==2.6.1`, a package that was officially deprecated in 2018 and does not install on Python 3.10+. |
-| `decred/cspp` (https://github.com/decred/cspp) | Modern production deployment | Reviewed as a real-world reference of the **CoinShuffle++** variant (DiceMix Light + DC-nets). Different protocol family, used as a contextual citation only. |
+| 1 | `pycrypto` → `cryptography` library | `pycrypto` is unmaintained |
+| 2 | `numpy.random.permutation` → `random.shuffle` | One less dependency |
+| 3 | HTTP request chain → in-process method calls | Single-executable side-by-side testing |
+| 4 | Python 2 syntax → Python 3 | Required |
+| 5 | Same class and method names preserved | Line-for-line traceability to upstream |
 
-Because none of these external sources is directly runnable for an
-instructor-driven side-by-side comparison, this project ships its own
-runnable reference in the form of `naive_mixer.py`. This baseline implements
-the **pre-CoinShuffle approach**: a centralized mixing server (the historical
-state of the art represented by services like Bitcoin Fog and BitLaundry,
-circa 2012–2014). It accepts the same CLI arguments and produces the same
-JSON output shape, which makes empirical comparison straightforward and which
-also lets the project demonstrate concretely *why* CoinShuffle was needed:
+The protocol logic, encryption-layering order, shuffle step, and final
+transaction assembly are **identical to upstream**.
 
-| Property | `naive_mixer.py` (pre-CoinShuffle) | `coinshuffle_mixing.py` (this project) |
+### Other sources studied (not used as the runnable reference)
+
+| Source | Why not chosen |
+|---|---|
+| Ruffing et al., 2014 — ESORICS paper | The original specification, not itself runnable code |
+| `decred/cspp` (https://github.com/decred/cspp) | Modern, but Go and CoinShuffle++ variant (different protocol family); cited for context only |
+
+---
+
+## 8. Baseline: `naive_mixer.py`
+
+`naive_mixer.py` is **not** the assignment's reference implementation — it
+is an extra comparison point representing the historical state of the art
+**before** CoinShuffle was proposed (services like Bitcoin Fog and
+BitLaundry, 2011–2014). It uses a trusted central server.
+
+### Why include the baseline?
+
+To make the value of CoinShuffle **measurable**:
+
+| Property | `naive_mixer.py` (baseline) | `coinshuffle_*.py` (original + reference) |
 |---|---|---|
 | Architecture | Centralized coordinator | Fully decentralized |
-| Encryption used during shuffling | None | Layered (onion) RSA-OAEP + AES |
+| Encryption during shuffling | None | Layered (onion) RSA-OAEP + AES |
 | Trusted third party required | **Yes** | **No** |
-| Mixer learns sender → receiver mapping | **Yes** (full permutation stored) | **No** (nobody has the full mapping) |
+| Mixer learns sender → receiver mapping | **Yes** | **No** |
 | External observer learns mapping | No | No |
 | Funds at risk from a malicious mixer | **Yes** | No (all participants must sign) |
 
-Running both files on the same seed produces the same *set* of output
-addresses (functional equivalence), but their `unlinkability` reports
-differ — see `test_compare.py` output.
-
 ---
 
-## 8. Cryptographic primitives used
+## 9. Cryptographic primitives used
 
-| Primitive | Where | Why this choice |
+| Primitive | Where | Why |
 |---|---|---|
-| RSA-2048 with OAEP padding | Layered encryption of output addresses | Standard public-key encryption supporting OAEP, well-supported in `cryptography` |
-| AES-128 (via Fernet) | Hybrid encryption payload | RSA alone has a small message-size limit; AES handles arbitrary payload sizes inside RSA-encrypted envelopes |
-| RSA-PSS with SHA-256 | Transaction signatures | Modern, provably secure RSA signature scheme (replaces older PKCS#1 v1.5) |
+| RSA-2048 with OAEP padding | Layered encryption of output addresses | Standard, well-supported in `cryptography` |
+| AES-128 (via Fernet) | Hybrid encryption payload | RSA alone has a small message-size limit |
+| RSA-PSS with SHA-256 | Transaction signatures (original) | Modern provably secure RSA signature scheme |
 | SHA-256 | Output address derivation | Standard cryptographic hash |
 
-The Ruffing et al. paper uses ECDSA (secp256k1) and ECIES because they target
-Bitcoin specifically. This project uses RSA-based equivalents because:
+The Ruffing et al. paper uses ECDSA (secp256k1) and ECIES because they
+target Bitcoin specifically. This project uses RSA-based equivalents
+because:
 
-1. The privacy properties are identical (layered public-key encryption +
-   signed transactions); only the underlying curve / algebra differs.
-2. The `cryptography` library's RSA support is more stable cross-platform than
-   its secp256k1 support, and this project is meant to be runnable by the
-   instructor on any modern OS without compilation.
+1. The privacy properties are identical (layered public-key encryption + signed transactions).
+2. `cryptography`'s RSA support is more stable cross-platform.
 
 ---
 
-## 9. What this implementation does *not* do (scope)
+## 10. What this implementation does *not* do (scope)
 
-The assignment brief lists three concrete requirements (mixing pool
-contract, shuffle inputs/outputs, prevent sender → receiver linking). The
-project sticks to that scope. Deliberately *not* included:
+The assignment brief lists three concrete requirements. The project sticks
+to that scope. Deliberately *not* included:
 
-- **Blame phase** for malicious participants (paper §3.4). Would add ~100
-  lines of equivocation detection and cryptographic accusations. Out of
-  scope for this assignment.
-- **On-chain integration.** No real Bitcoin or Ethereum interaction; the
-  protocol runs in-process and produces a JSON "transaction" object that
-  represents what would be broadcast.
-- **Network protocol.** No TCP/socket layer; players are simulated in the
-  same Python process. The cryptography and protocol logic are identical to
-  what a real distributed deployment would do.
-- **Solidity smart contract.** CoinShuffle was designed for Bitcoin (which
-  has no general-purpose smart contracts), and its core privacy mechanism
-  must execute *off-chain* — running layered encryption on-chain would
-  publish all ciphertexts and break unlinkability.
+- **Blame phase** for malicious participants (paper §3.4).
+- **On-chain integration.** No real Bitcoin or Ethereum interaction.
+- **Network protocol.** Players are simulated in the same Python process.
+- **Solidity smart contract.** CoinShuffle's privacy mechanism must execute
+  off-chain — running layered encryption on-chain would publish all
+  ciphertexts and break unlinkability.
 
 ---
 
-## 10. Submission information
+## 11. Submission information
 
-- **Personal repository (this one):** https://github.com/MertMirzanli/coinshuffle-mixing-project
+- **Personal repository:** https://github.com/MertMirzanli/coinshuffle-mixing-project
 - **Course repository branch:** `students/<student-branch>/06-coinshuffle-mixing` on https://github.com/OsmanSelvi84/blockchain-privacy-projects (to be pushed after this version is finalized).
 
 ---
 
-## 11. References
+## 12. References
 
-1. Ruffing, T., Moreno-Sanchez, P., Kate, A. (2014). *CoinShuffle: Practical
-   Decentralized Coin Mixing for Bitcoin.* ESORICS 2014.
-2. Chaum, D. (1981). *Untraceable Electronic Mail, Return Addresses, and
-   Digital Pseudonyms.* Communications of the ACM, 24(2). — original
-   decryption mix network on which CoinShuffle is built.
-3. Maxwell, G. (2013). *CoinJoin: Bitcoin privacy for the real world.* —
-   predecessor design that CoinShuffle improves upon.
-4. `atong01/coinshuffle` — https://github.com/atong01/coinshuffle (studied
-   reference, not runnable on modern Python).
-5. `decred/cspp` — https://github.com/decred/cspp (modern CoinShuffle++
-   reference).
+1. Ruffing, T., Moreno-Sanchez, P., Kate, A. (2014). *CoinShuffle: Practical Decentralized Coin Mixing for Bitcoin.* ESORICS 2014.
+2. Chaum, D. (1981). *Untraceable Electronic Mail, Return Addresses, and Digital Pseudonyms.* Communications of the ACM, 24(2).
+3. Maxwell, G. (2013). *CoinJoin: Bitcoin privacy for the real world.*
+4. Tong, A. (2017). `atong01/coinshuffle` — https://github.com/atong01/coinshuffle. Source for `coinshuffle_reference.py` (Python 3 port).
+5. Decred Project. `decred/cspp` — https://github.com/decred/cspp. Contextual reference.
