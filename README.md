@@ -61,16 +61,26 @@ coinshuffle-mixing-project/
 
 ## 3. Required software and dependencies
 
-- **Python 3.10 or newer** (tested on Python 3.14 on Windows 11)
+- **Python 3.10 or newer** (tested on Python 3.14 on Windows 11, Python 3.12 on Ubuntu 24.04)
 - **`cryptography` library**
 
-### Install
+### Install (Windows)
 
 ```bash
-pip install cryptography
+python -m pip install cryptography
 ```
 
-That's the only dependency.
+### Install (Ubuntu / Linux)
+
+```bash
+sudo apt install python3 python3-pip git
+python3 -m pip install cryptography
+```
+
+If you see an "externally-managed-environment" error on Ubuntu, use:
+```bash
+python3 -m pip install --user cryptography
+```
 
 ---
 
@@ -85,37 +95,49 @@ cd coinshuffle-mixing-project
 
 ### Step 2 — Install the single dependency
 
+**Windows:**
 ```bash
-pip install cryptography
+python -m pip install cryptography
+```
+
+**Ubuntu / Linux:**
+```bash
+python3 -m pip install cryptography
 ```
 
 ### Step 3 — Run the original implementation
 
+**Windows:**
 ```bash
 python coinshuffle_mixing.py
 python coinshuffle_mixing.py <num_players> <amount> <seed>
-# example:
-python coinshuffle_mixing.py 5 10 100
+```
+
+**Ubuntu / Linux:**
+```bash
+python3 coinshuffle_mixing.py
+python3 coinshuffle_mixing.py <num_players> <amount> <seed>
 ```
 
 ### Step 4 — Run the reference implementation
 
 ```bash
-python coinshuffle_reference.py
-python coinshuffle_reference.py 5 10 100
+python coinshuffle_reference.py        # Windows
+python3 coinshuffle_reference.py       # Ubuntu / Linux
 ```
 
 ### Step 5 — Run the baseline
 
 ```bash
-python naive_mixer.py
-python naive_mixer.py 5 10 100
+python naive_mixer.py                  # Windows
+python3 naive_mixer.py                 # Ubuntu / Linux
 ```
 
 ### Step 6 — Run the automated comparison test
 
 ```bash
-python test_compare.py
+python test_compare.py                 # Windows
+python3 test_compare.py                # Ubuntu / Linux
 ```
 
 Expected output ends with:
@@ -123,11 +145,6 @@ Expected output ends with:
 ```
 RESULT: 5 passed, 0 failed (out of 5)
 ```
-
-The test runs all three implementations against five different test inputs
-and verifies they produce the same set of output addresses.
-
----
 
 ## 5. Sample input and output
 
